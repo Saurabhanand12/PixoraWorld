@@ -12,98 +12,106 @@ export const register = async (req, res) => {
 
         if (!username || !email || !password) {
             return res.status(400).json({
-                message: "Something is missing , please check",
+                message: "Something is missing, please check",
                 success: false,
             });
         }
 
-        const user1 = await usermodel.findOne({ username,email });
+        // ✅ check email OR username
+        const user1 = await usermodel.findOne({
+            $or: [{ email }, { username }]
+        });
+
         if (user1) {
             return res.status(400).json({
-                message: "Email ID is Already Exists",
+                message: "User already exists",
                 success: false,
             });
         }
 
         const hash = await bcrypt.hash(password, 10);
+
         await usermodel.create({
             username,
             email,
             password: hash,
         });
+
         return res.status(201).json({
-            message: "Account Created Successfully..",
+            message: "Account Created Successfully",
             success: true,
         });
 
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: "Server Error" });
+    }
+};
+
+
+export const login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({
+                message: "Email or password missing",
+                success: false,
+            });
+        }
+
+        const userdoc = await usermodel.findOne({ email });
+        if (!userdoc) {
+            return res.status(401).json({
+                message: "Incorrect Email or Password",
+                success: false,
+            });
+        }
+
+        const matchpassword = await bcrypt.compare(password, userdoc.password);
+        if (!matchpassword) {
+            return res.status(401).json({
+                message: "Incorrect Email or Password",
+                success: false,
+            });
+        }
+
+        const token = jwt.sign(
+            { userid: userdoc._id },
+            process.env.SECRET_KEY,
+            { expiresIn: "1d" }
+        );
+
+        const user = {
+            _id: userdoc._id,
+            username: userdoc.username,
+            email: userdoc.email,
+            bio: userdoc.bio,
+            profilepic: userdoc.profilepic,
+            followers: userdoc.followers,
+            following: userdoc.following,
+            posts: userdoc.posts,
+        };
+
+        return res
+            .cookie("token", token, {
+                httpOnly: true,
+                sameSite: "lax",
+                secure: false, // localhost only
+                path: "/",     // ⭐ ADD THIS
+                maxAge: 24 * 60 * 60 * 1000,
+            })
+            .status(200)
+            .json({
+                message: `Welcome Back ${user.username}`,
+                success: true,
+                user,
+            });
 
     } catch (error) {
         console.log(error);
+        res.status(500).json({ success: false, message: "Server error" });
     }
-}
-
-export const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        message: "Email or password missing",
-        success: false,
-      });
-    }
-
-    const userdoc = await usermodel.findOne({ email });
-    if (!userdoc) {
-      return res.status(401).json({
-        message: "Incorrect Email or Password",
-        success: false,
-      });
-    }
-
-    const matchpassword = await bcrypt.compare(password, userdoc.password);
-    if (!matchpassword) {
-      return res.status(401).json({
-        message: "Incorrect Email or Password",
-        success: false,
-      });
-    }
-
-    const token = jwt.sign(
-      { userid: userdoc._id },
-      process.env.SECRET_KEY,
-      { expiresIn: "1d" }
-    );
-
-    const user = {
-      _id: userdoc._id,
-      username: userdoc.username,
-      email: userdoc.email,
-      bio: userdoc.bio,
-      profilepic: userdoc.profilepic,
-      followers: userdoc.followers,
-      following: userdoc.following,
-      posts: userdoc.posts,
-    };
-
-    return res
-      .cookie("token", token, {
-        httpOnly: true,
-        sameSite: "lax",   // 🔥 IMPORTANT
-        secure: false,     // true only in production
-        maxAge: 24 * 60 * 60 * 1000,
-      })
-      .status(200)
-      .json({
-        message: `Welcome Back ${user.username}`,
-        success: true,
-        user,
-      });
-
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
 };
 
 export const logout = async (req, res) => {
@@ -120,7 +128,7 @@ export const logout = async (req, res) => {
 export const getProfile = async (req, res) => {
     try {
         const userid = req.params.id;
-        let user = await usermodel.findById(userid).populate({path:'posts',createdAt:-1}).populate('bookmarks');
+        let user = await usermodel.findById(userid).populate({ path: 'posts', createdAt: -1 }).populate('bookmarks');
         return res.status(200).json({
             user,
             success: true
@@ -218,7 +226,7 @@ export const followOrunfollow = async (req, res) => {
             ]);
 
             return res.status(200).json({
-                type:'unfollow',
+                type: 'unfollow',
                 message: "Unfollowed successfully",
                 success: true,
             });
@@ -230,7 +238,7 @@ export const followOrunfollow = async (req, res) => {
             ]);
 
             return res.status(200).json({
-                type:'follow',
+                type: 'follow',
                 message: "Followed successfully",
                 success: true,
             });

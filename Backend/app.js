@@ -10,21 +10,30 @@ import dotenv from 'dotenv'   // use for security reason
 import connectDB from './config/mongoose-connection.js';
 import {app , server} from  './socket/socket.js'
 dotenv.config({});
+import path from 'path'
 
 const PORT = process.env.PORT || 7000;
+
+// const __dir = path.resolve();                     //C:\Pixora\Backend
+                                  
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use(cookieparser());
 
-const corsoption ={                  // use another api easly
-    origin : 'http://localhost:5173', 
-    credentials :true
-} 
-app.use(cors(corsoption));
+app.use(cors({
+  origin: "http://localhost:5173", // frontend URL
+  credentials: true
+}));
 
 await connectDB();
+
+
+// app.use(express.static(path.join(__dir,"/frontend/dist")));
+// app.get("*",(req,res)=>{
+//     res.sendFile(path.resolve(__dir,"frontend","dist","index.html"));
+// })
 
 app.get('/',(req,res)=>{
     res.send("they are working");
